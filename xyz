@@ -130,6 +130,9 @@ version=$(node -p "require('./package.json').version" 2>/dev/null) ||
 next_version=$("$dir/node_modules/.bin/semver" -i "$increment" "$version") ||
   (echo "Cannot increment version number" >&2 ; exit 1)
 
+next_dev_version=$("$dir/node_modules/.bin/semver" -i patch "$next_version") ||
+  (echo "Cannot increment version number" >&2 ; exit 1)
+
 message="${message_template//X.Y.Z/$next_version}"
 tag="${tag_template//X.Y.Z/$next_version}"
 
@@ -162,12 +165,31 @@ inc() {
   fi
 }
 
-inc package.json
-inc bower.json
-inc component.json
+inc_dev() {
+  if [[ -f "$1" ]] ; then
+    run "node -e '$(echo "
+      var o = require('./$1'); o.version = '$next_dev_version-dev';
+      require('fs').writeFileSync('./$1', JSON.stringify(o, null, 2) + '\n');
+    " | tr "'" '"' | tr -d "\n" | tr -s " " | sed -e "s/^ *//" -e "s/ *$//")'"
+    run "git add '$1'"
+  fi
+}
 
-run "git commit --message '$message'"
-run "git tag --annotate '$tag' --message '$message'"
+run "git checkout -b '$tag'"
+    inc package.json
+    inc bower.json
+    inc component.json
+
+    run "git commit --message '$message'"
+    run "git tag --annotate '$tag' --message '$message'"
+
+run "git checkout -"
+    inc_dev package.json
+    inc_dev bower.json
+    inc_dev component.json
+
+    run "git commit --message 'version $next_dev_version-dev starts'"
+
 run "git push '$repo' 'refs/heads/$branch' 'refs/tags/$tag'"
 
 # run "npm publish"
