@@ -175,10 +175,21 @@ inc_dev() {
   fi
 }
 
+inc_dev_for_manifest() {
+  if [[ -f "$1" ]] ; then
+    run "node -e '$(echo "
+      var o = require('./$1'); o.version = '$next_dev_version';
+      require('fs').writeFileSync('./$1', JSON.stringify(o, null, 2) + '\n');
+    " | tr "'" '"' | tr -d "\n" | tr -s " " | sed -e "s/^ *//" -e "s/ *$//")'"
+    run "git add '$1'"
+  fi
+}
+
 run "git checkout -b '$tag'"
     inc package.json
     inc bower.json
     inc component.json
+    inc src/manifest.json
 
     run "git commit --message '$message'"
     run "git tag --annotate '$tag' --message '$message'"
@@ -187,6 +198,7 @@ run "git checkout -"
     inc_dev package.json
     inc_dev bower.json
     inc_dev component.json
+    inc_dev_for_manifest src/manifest.json
 
     run "git commit --message 'version $next_dev_version-dev starts'"
 
